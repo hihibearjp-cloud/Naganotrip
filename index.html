@@ -3,658 +3,246 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>班級小管家</title>
+  <title>長野旅人手帳</title>
   
+  <!-- GitHub Pages Ready: 此單一檔案可直接上傳至 GitHub 並透過 GitHub Pages 託管 -->
+  
+  <!-- App 模式設定 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#FEF9F2">
-  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3595/3595490.png">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/color/192/fuji-mountain.png">
 
+  <!-- 載入核心工具 (使用 CDN，無需安裝) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.min.js"></script>
-
   <style>
-    /* 修正 iOS 底部安全區域 */
+    body { 
+      font-family: -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+      background-color: #f8fafc;
+      user-select: none;
+    }
     .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-    .pb-safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom); }
-    
-    /* 隱藏捲軸但保留功能 */
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .pt-safe { padding-top: env(safe-area-inset-top); }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .btn-active:active { transform: scale(0.95); opacity: 0.8; }
   </style>
 </head>
-<body class="bg-[#FEF9F2]">
-  <div id="root"></div>
+<body>
+  <div id="root" class="h-[100dvh] w-full bg-slate-50 text-slate-900 overflow-hidden"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
-    
-    // 從全域變數取得圖示
-    const { 
-      Calendar, User, Users, Clock, BookOpen, AlertCircle, 
-      CheckCircle2, MessageCircle, MicOff, Coffee, FileWarning, 
-      Edit3, Trash2, ChevronDown, ChevronUp, Save, Share2,
-      Plus, X, Briefcase, Stethoscope, Palmtree, HelpCircle, Star, PackageX,
-      ClipboardCopy, Smile, Download, Settings, FileSpreadsheet, List, UserCog,
-      Share, MoreVertical, LayoutGrid, Info, PenTool, AlertTriangle, Megaphone, Send,
-      Smartphone, Database, Upload, Check
-    } = window.lucideReact;
+    const { useState, useEffect } = React;
 
-    // --- 1. 全局樣式與字體 ---
-    const customStyles = `
-      @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+    // --- 圖示元件 (SVG) ---
+    const Icon = ({ path, color }) => (
+      <svg className={`w-6 h-6 ${color}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        {path}
+      </svg>
+    );
 
-      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-      body {
-        background-color: #FEF9F2;
-        background-image: 
-          linear-gradient(#E8E8E8 1px, transparent 1px),
-          linear-gradient(90deg, #E8E8E8 1px, transparent 1px);
-        background-size: 20px 20px;
-        font-family: 'ZCOOL KuaiLe', cursive, sans-serif;
-        color: #5D4037;
-        font-size: 18px; 
-        overscroll-behavior-y: none;
-        user-select: none;
-      }
-
-      .btn-3d {
-        transition: transform 0.05s, box-shadow 0.05s;
-        border: 3px solid #5D4037;
-        box-shadow: 4px 4px 0px #5D4037;
-        border-radius: 16px; 
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        cursor: pointer;
-        font-size: 1.2rem; 
-      }
-      
-      .btn-3d:active {
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0px #5D4037;
-      }
-
-      .bg-mint { background-color: #CDF0EA; }
-      .bg-yellow { background-color: #FDFD96; }
-      .bg-pink { background-color: #FFC4C4; }
-      .bg-blue-soft { background-color: #C4E4FF; }
-      .bg-purple-soft { background-color: #E2C4FF; }
-      .bg-orange-soft { background-color: #FFD8B1; }
-      .bg-red-alert { background-color: #FF8A80; color: white; }
-      .bg-line { background-color: #06C755; color: white; }
-      .bg-dark { background-color: #4A4A4A; color: white; }
-
-      .text-coffee { color: #5D4037; }
-      .border-coffee { border-color: #5D4037; }
-
-      .doodle-card {
-        background: white;
-        border: 3px solid #5D4037;
-        border-radius: 24px;
-        box-shadow: 6px 6px 0px rgba(93, 64, 55, 0.2);
-      }
-
-      .input-hand {
-        border: 3px solid #5D4037;
-        border-radius: 12px;
-        padding: 12px 16px; 
-        background: #FFF;
-        font-family: 'ZCOOL KuaiLe', cursive;
-        outline: none;
-        width: 100%;
-        font-size: 1.1rem; 
-        user-select: text;
-      }
-      .input-hand:focus { box-shadow: 3px 3px 0px #5D4037; }
-      
-      .modal-scroll {
-        max-height: 70vh;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-    `;
-
-    // --- 2. 常數定義 ---
-    const PERIODS = [
-      { id: 'early', label: '早修' },
-      { id: 'p1', label: '第一節' },
-      { id: 'p2', label: '第二節' },
-      { id: 'p3', label: '第三節' },
-      { id: 'p4', label: '第四節' },
-      { id: 'lunch', label: '午餐' },
-      { id: 'nap', label: '午休' },
-      { id: 'p5', label: '第五節' },
-      { id: 'p6', label: '第六節' },
-      { id: 'p7', label: '第七節' },
-      { id: 'p8', label: '第八節' },
-    ];
-
-    const DEFAULT_BEHAVIORS = [
-      { id: 'item_missing', label: '物品未帶', icon: 'PackageX', color: 'bg-pink' },
-      { id: 'late_class', label: '晚進教室', icon: 'Clock', color: 'bg-yellow' },
-      { id: 'rude', label: '對師不禮貌', icon: 'MicOff', color: 'bg-pink' },
-      { id: 'noise', label: '吵鬧干擾', icon: 'AlertCircle', color: 'bg-pink' },
-      { id: 'chat', label: '聊天', icon: 'MessageCircle', color: 'bg-yellow' },
-      { id: 'note', label: '傳紙條', icon: 'FileWarning', color: 'bg-yellow' },
-      { id: 'other_book', label: '看課外書', icon: 'BookOpen', color: 'bg-yellow' },
-      { id: 'sleep', label: '打瞌睡', icon: 'Coffee', color: 'bg-pink' },
-      { id: 'no_hw_cls', label: '作業未交', icon: 'FileWarning', color: 'bg-pink' },
-      { id: 'other', label: '其他', icon: 'PenTool', color: 'bg-blue-soft' },
-    ];
-
-    const ATTENDANCE_TYPES = [
-      { id: 'late', label: '遲到', icon: Clock, color: 'bg-yellow' },
-      { id: 'sick', label: '病假', icon: Stethoscope, color: 'bg-mint' },
-      { id: 'official', label: '公假', icon: Briefcase, color: 'bg-blue-soft' },
-      { id: 'personal', label: '事假', icon: Palmtree, color: 'bg-purple-soft' },
-      { id: 'other_leave', label: '其他', icon: HelpCircle, color: 'bg-gray-200' },
-      { id: 'absent', label: '缺席', icon: AlertCircle, color: 'bg-pink' },
-    ];
-
-    const CONTACT_BOOK_TYPES = [
-      { id: 'cb_missing', label: '聯絡簿缺交', icon: X, color: 'bg-pink' },
-      { id: 'cb_no_sign', label: '家長未簽名', icon: PenTool, color: 'bg-yellow' }, 
-      { id: 'cb_good', label: '聯絡簿優良', icon: Star, color: 'bg-mint' },
-    ];
-
-    const DEFAULT_SUBJECTS = [
-      { id: 'chinese', label: '國文' },
-      { id: 'english', label: '英語' },
-      { id: 'math', label: '數學' },
-      { id: 'science', label: '理化' },
-      { id: 'civics', label: '公民' },
-      { id: 'history', label: '歷史' },
-      { id: 'geo', label: '地理' },
-    ];
-
-    const ICON_MAP = {
-      PackageX, Clock, MicOff, AlertCircle, MessageCircle, FileWarning, BookOpen, Coffee, HelpCircle, PenTool
+    const paths = {
+      book: <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />,
+      money: <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+      pen: <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
+      bus: <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />,
+      trash: <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     };
 
-    const DB_KEY = 'classLogDB_V10_Final'; 
-
-    // --- 3. 獨立元件：學生選擇器 ---
-    const StudentSelectorModal = ({ isOpen, onClose, students, selectedList, title, onToggle }) => {
-      if (!isOpen) return null;
-      return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#FEF9F2] w-full max-w-sm rounded-2xl border-4 border-coffee shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="bg-yellow p-4 border-b-4 border-coffee flex justify-between items-center">
-              <h3 className="text-2xl font-bold text-coffee">點選學生</h3>
-              <button onClick={onClose} className="bg-white p-2 rounded-full border-2 border-coffee"><CheckCircle2 size={32} /></button>
-            </div>
-            <div className="bg-yellow px-4 pb-2 text-coffee font-bold opacity-80 border-b-2 border-coffee mb-2">正在登記：{title}</div>
-            <div className="p-4 overflow-y-auto grid grid-cols-4 gap-3 modal-scroll">
-              {students.map(s => (
-                <button key={s.id} onClick={() => onToggle(s.id)} className={`p-2 rounded-xl border-2 border-coffee font-bold text-base flex flex-col items-center justify-center transition-all min-h-[70px] ${selectedList.includes(s.id) ? 'bg-coffee text-white transform scale-105 shadow-lg' : 'bg-white text-coffee hover:bg-gray-100'}`}>
-                  <span className="text-sm opacity-70 mb-1">#{s.id}</span>
-                  <span className="truncate w-full text-center text-lg">{s.name}</span>
-                </button>
-              ))}
-            </div>
-            <div className="p-4 bg-white border-t-4 border-coffee text-center"><button onClick={onClose} className="btn-3d w-full bg-mint py-4 text-2xl">完 成</button></div>
-          </div>
-        </div>
-      );
-    };
-
-    // --- 4. 主程式 App ---
+    // --- 主程式邏輯 ---
     function App() {
-      const [activeTab, setActiveTab] = useState('basic'); 
+      const [view, setView] = useState('guide');
+      const [expenses, setExpenses] = useState([]);
+      const [journals, setJournals] = useState([]);
       
-      const [currentDate, setCurrentDate] = useState(() => {
-        const now = new Date();
-        const offset = now.getTimezoneOffset() * 60000;
-        return new Date(now.getTime() - offset).toISOString().split('T')[0];
-      });
+      // 輸入欄位狀態
+      const [inputName, setInputName] = useState('');
+      const [inputCost, setInputCost] = useState('');
+      const [inputText, setInputText] = useState('');
 
-      const safeLoad = (key, defaultVal) => {
-        try {
-          const saved = localStorage.getItem(key);
-          return saved ? JSON.parse(saved) : defaultVal;
-        } catch (e) {
-          console.error("Load Error:", e);
-          return defaultVal; 
-        }
-      };
-
-      const [db, setDb] = useState(() => safeLoad(DB_KEY, {}));
-      const [saveStatus, setSaveStatus] = useState('idle');
-
-      const [subjects, setSubjects] = useState(() => safeLoad('classLogSubjects', DEFAULT_SUBJECTS));
-      const [behaviors, setBehaviors] = useState(() => safeLoad('classLogBehaviors', DEFAULT_BEHAVIORS));
-      const [students, setStudents] = useState(() => safeLoad('classLogStudents', Array.from({ length: 30 }, (_, i) => ({ id: i + 1, name: `${i + 1}號` }))));
-      const [teacherNote, setTeacherNote] = useState(() => safeLoad('classLogTeacherNote', ''));
-
-      const todayData = useMemo(() => {
-        const data = db[currentDate] || {};
-        return {
-          week: data.week || '',
-          dutyOfficer: data.dutyOfficer || '',
-          dutyStudent: data.dutyStudent || '',
-          attendanceData: data.attendanceData || {},
-          missingData: data.missingData || {},
-          classLogData: data.classLogData || {},
-          periodNotes: data.periodNotes || {},
-          incidentLog: data.incidentLog || ''
-        };
-      }, [db, currentDate]);
-
-      const updateToday = (field, value) => {
-        setSaveStatus('saving');
-        setDb(prevDb => {
-          const newDb = {
-            ...prevDb,
-            [currentDate]: {
-              ...prevDb[currentDate] || {},
-              ...prevDb[currentDate],
-              [field]: value
-            }
-          };
-          try {
-            localStorage.setItem(DB_KEY, JSON.stringify(newDb));
-            setTimeout(() => setSaveStatus('saved'), 500);
-          } catch (e) {
-            alert("⚠️ 警告：儲存空間不足！");
-          }
-          return newDb;
-        });
-      };
-
-      useEffect(() => localStorage.setItem('classLogSubjects', JSON.stringify(subjects)), [subjects]);
-      useEffect(() => localStorage.setItem('classLogBehaviors', JSON.stringify(behaviors)), [behaviors]);
-      useEffect(() => localStorage.setItem('classLogStudents', JSON.stringify(students)), [students]);
-      useEffect(() => localStorage.setItem('classLogTeacherNote', teacherNote), [teacherNote]);
-
-      const [newSubjectName, setNewSubjectName] = useState('');
-      const [isAddingSubject, setIsAddingSubject] = useState(false);
-      const [newBehaviorName, setNewBehaviorName] = useState('');
-      const [isEditingBehaviors, setIsEditingBehaviors] = useState(false);
-      const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-      const [selectorConfig, setSelectorConfig] = useState({ type: '', category: '', period: '' });
-      const [selectedStudentReport, setSelectedStudentReport] = useState(1);
-      const [bulkNamesInput, setBulkNamesInput] = useState(''); 
-      const [currentSubjectId, setCurrentSubjectId] = useState('');
-      const [currentLogPeriod, setCurrentLogPeriod] = useState('p1');
-
+      // 初始化：讀取 LocalStorage
       useEffect(() => {
-        if (subjects.length > 0 && !currentSubjectId) setCurrentSubjectId(subjects[0].id);
-        else if (currentSubjectId && !subjects.find(s => s.id === currentSubjectId)) setCurrentSubjectId(subjects[0]?.id || '');
-      }, [subjects, currentSubjectId]);
+        const savedEx = localStorage.getItem('nagano_ex');
+        const savedJo = localStorage.getItem('nagano_jo');
+        if (savedEx) setExpenses(JSON.parse(savedEx));
+        else setExpenses([
+          { id: 1, name: '新幹線 (東京-長野)', cost: 8500, date: '預算' },
+          { id: 2, name: '巴士 (往戶隱)', cost: 1400, date: '預算' }
+        ]);
+        if (savedJo) setJournals(JSON.parse(savedJo));
+      }, []);
 
-      const toggleStudent = (studentId) => {
-        const { type, category, period } = selectorConfig;
-        if (type === 'attendance') {
-          const currentList = todayData.attendanceData[category] || [];
-          const newList = currentList.includes(studentId) ? currentList.filter(id => id !== studentId) : [...currentList, studentId];
-          updateToday('attendanceData', { ...todayData.attendanceData, [category]: newList });
-        } 
-        else if (type === 'missing') {
-          const currentList = todayData.missingData[category] || [];
-          const newList = currentList.includes(studentId) ? currentList.filter(id => id !== studentId) : [...currentList, studentId];
-          updateToday('missingData', { ...todayData.missingData, [category]: newList });
-        } 
-        else if (type === 'log') {
-          const periodData = todayData.classLogData[period] || {};
-          const currentList = periodData[category] || [];
-          const newList = currentList.includes(studentId) ? currentList.filter(id => id !== studentId) : [...currentList, studentId];
-          updateToday('classLogData', { ...todayData.classLogData, [period]: { ...periodData, [category]: newList } });
-        }
-      };
+      // 自動存檔
+      useEffect(() => { localStorage.setItem('nagano_ex', JSON.stringify(expenses)); }, [expenses]);
+      useEffect(() => { localStorage.setItem('nagano_jo', JSON.stringify(journals)); }, [journals]);
 
-      const getSelectedList = () => {
-        const { type, category, period } = selectorConfig;
-        if (type === 'attendance') return todayData.attendanceData[category] || [];
-        if (type === 'missing') return todayData.missingData[category] || [];
-        if (type === 'log') return todayData.classLogData[period]?.[category] || [];
-        return [];
+      // 功能函數：記帳
+      const addEx = () => {
+        if (!inputName || !inputCost) return;
+        setExpenses([{ id: Date.now(), name: inputName, cost: parseInt(inputCost), date: new Date().toLocaleDateString() }, ...expenses]);
+        setInputName(''); setInputCost('');
       };
-
-      const updatePeriodNote = (val) => {
-        updateToday('periodNotes', { ...todayData.periodNotes, [currentLogPeriod]: val });
-      };
-
-      const handleBulkImportNames = () => {
-        if (!bulkNamesInput.trim()) return;
-        const names = bulkNamesInput.split(/\n/).map(n => n.trim()).filter(n => n);
-        if (confirm(`即將匯入 ${names.length} 位學生，確定嗎？`)) {
-          setStudents(names.map((name, index) => ({ id: index + 1, name: name })));
-          setBulkNamesInput('');
-          alert('匯入成功！');
-        }
-      };
-      const handleUpdateStudentName = (id, newName) => setStudents(students.map(s => s.id === id ? { ...s, name: newName } : s));
-      const handleAddSubject = () => { if (newSubjectName.trim()) { const newId = `sub_${Date.now()}`; setSubjects([...subjects, { id: newId, label: newSubjectName.trim() }]); setNewSubjectName(''); setIsAddingSubject(false); setCurrentSubjectId(newId); } };
-      const handleDeleteSubject = (id, e) => { e.stopPropagation(); if (confirm('確定刪除此科目？')) setSubjects(subjects.filter(s => s.id !== id)); };
-      const handleAddBehavior = () => { if (newBehaviorName.trim()) { const colors = ['bg-pink', 'bg-yellow', 'bg-mint', 'bg-blue-soft']; setBehaviors([...behaviors, { id: `beh_${Date.now()}`, label: newBehaviorName.trim(), icon: 'AlertCircle', color: colors[Math.floor(Math.random() * colors.length)] }]); setNewBehaviorName(''); } };
-      const handleDeleteBehavior = (id, e) => { e.stopPropagation(); if (confirm('確定刪除此項目？')) setBehaviors(behaviors.filter(b => b.id !== id)); };
+      const delEx = (id) => setExpenses(expenses.filter(e => e.id !== id));
       
-      const handleBehaviorClick = (behaviorId) => {
-        if (isEditingBehaviors) return;
-        if (behaviorId === 'other') {
-          const note = prompt(`請輸入 ${PERIODS.find(p=>p.id===currentLogPeriod)?.label} 的其他說明：`, todayData.periodNotes[currentLogPeriod] || '');
-          if (note !== null) updatePeriodNote(note);
-          openSelector('log', behaviorId, currentLogPeriod);
-        } else {
-          openSelector('log', behaviorId, currentLogPeriod);
-        }
+      // 功能函數：日記
+      const addJo = () => {
+        if (!inputText) return;
+        setJournals([{ id: Date.now(), text: inputText, date: new Date().toLocaleString() }, ...journals]);
+        setInputText('');
       };
-      const openSelector = (type, category, period = null) => { setSelectorConfig({ type, category, period }); setIsSelectorOpen(true); };
+      const delJo = (id) => setJournals(journals.filter(j => j.id !== id));
 
-      const handleBackupData = () => {
-        const backupData = { version: '10.0', timestamp: new Date().toISOString(), allData: db, settings: { subjects, behaviors, students, teacherNote } };
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
-        const link = document.createElement('a'); link.href = dataStr; link.download = `班級小管家_備份_${currentDate}.json`; link.click();
-      };
-      const handleRestoreData = (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const backup = JSON.parse(e.target.result);
-            if (confirm(`確定要還原資料嗎？目前的資料將被覆蓋！`)) {
-              if (backup.allData) { setDb(backup.allData); localStorage.setItem(DB_KEY, JSON.stringify(backup.allData)); }
-              if (backup.settings) {
-                 if (backup.settings.subjects) setSubjects(backup.settings.subjects);
-                 if (backup.settings.behaviors) setBehaviors(backup.settings.behaviors);
-                 if (backup.settings.students) setStudents(backup.settings.students);
-                 if (backup.settings.teacherNote) setTeacherNote(backup.settings.teacherNote);
-              }
-              alert('✅ 還原成功！');
-            }
-          } catch { alert('❌ 檔案錯誤'); }
-        };
-        reader.readAsText(file);
-        event.target.value = '';
-      };
-      const downloadCSV = (content, filename) => {
-        const bom = '\uFEFF'; const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = filename; link.click();
-      };
-
-      const getWeeklyStats = (studentId) => {
-        const dates = []; const today = new Date(currentDate);
-        for (let i = 0; i < 5; i++) { const d = new Date(today); d.setDate(today.getDate() - i); dates.push(d.toISOString().split('T')[0]); }
-        let stats = { attendance: {}, missing: {}, behavior: {} };
-        let detailedBehaviors = [], detailedAttendance = [], detailedMissing = [];
-        
-        dates.forEach(date => {
-          const data = db[date]; if (!data) return;
-          const dateStr = date.slice(5).replace('-','/');
-          
-          if (data.attendanceData) Object.keys(data.attendanceData).forEach(k => { if (data.attendanceData[k]?.includes(studentId)) { stats.attendance[k] = (stats.attendance[k] || 0) + 1; const type = ATTENDANCE_TYPES.find(t => t.id === k); detailedAttendance.push(`${dateStr} ${type ? type.label : k}`); } });
-          if (data.missingData) Object.keys(data.missingData).forEach(k => { if (data.missingData[k]?.includes(studentId)) { let label = k; const sub = subjects.find(s => s.id === k); const cb = CONTACT_BOOK_TYPES.find(c => c.id === k); if (sub) label = sub.label + '作業缺交'; if (cb) label = cb.label; stats.missing[label] = (stats.missing[label] || 0) + 1; detailedMissing.push(`${dateStr} ${label}`); } });
-          if (data.classLogData) Object.keys(data.classLogData).forEach(periodId => { const pLog = data.classLogData[periodId]; const pNote = data.periodNotes?.[periodId]; if (pLog) { Object.keys(pLog).forEach(bId => { if (pLog[bId]?.includes(studentId)) { const b = behaviors.find(be => be.id === bId); let label = b ? b.label : '其他'; let displayLabel = label; if (bId === 'other') { if (pNote) displayLabel = pNote; else displayLabel = "其他違規"; } else { if (pNote) displayLabel = `${label} (${pNote})`; } const periodLabel = PERIODS.find(p => p.id === periodId)?.label || periodId; stats.behavior[label] = (stats.behavior[label] || 0) + 1; detailedBehaviors.push(`${dateStr} ${periodLabel}：${displayLabel}`); } }); } });
-        });
-        return { dates, stats, detailedBehaviors: detailedBehaviors.reverse(), detailedAttendance: detailedAttendance.reverse(), detailedMissing: detailedMissing.reverse() };
-      };
-
-      const exportWholeClassWeekly = () => { const dates = []; const today = new Date(currentDate); for (let i = 0; i < 5; i++) { const d = new Date(today); d.setDate(today.getDate() - i); dates.push(d.toISOString().split('T')[0]); } const dateRange = `${dates[dates.length-1]} ~ ${dates[0]}`; let csv = `全班週報表\n統計範圍,${dateRange}\n\n`; csv += `座號,姓名,缺勤總數,缺交總數,違規總數,缺勤明細,缺交明細,違規明細\n`; students.forEach(student => { const { stats, detailedBehaviors, detailedAttendance, detailedMissing } = getWeeklyStats(student.id); const totalAtt = Object.values(stats.attendance).reduce((a,b) => a+b, 0); const totalMiss = Object.values(stats.missing).reduce((a,b) => a+b, 0); const totalBeh = Object.values(stats.behavior).reduce((a,b) => a+b, 0); csv += `${student.id},${student.name},${totalAtt},${totalMiss},${totalBeh},"${detailedAttendance.join('；')}","${detailedMissing.join('；')}","${detailedBehaviors.join('；')}"\n`; }); downloadCSV(csv, `全班週報表_${currentDate}.csv`); };
-      const exportStudentWeekly = () => { const s = students.find(s => s.id === selectedStudentReport); if(!s) return alert('請先選擇學生'); const { dates, stats } = getWeeklyStats(selectedStudentReport); let csv = `學生個別週報表\n座號,${s.id}\n姓名,${s.name}\n統計範圍,${dates[dates.length-1]} ~ ${dates[0]}\n\n`; csv += `類別,項目,次數\n`; Object.entries(stats.attendance).forEach(([k, v]) => csv += `缺勤,${ATTENDANCE_TYPES.find(t=>t.id===k)?.label||k},${v}\n`); Object.entries(stats.missing).forEach(([k, v]) => csv += `缺交,${k},${v}\n`); Object.entries(stats.behavior).forEach(([k, v]) => csv += `違規,${k},${v}\n`); downloadCSV(csv, `${s.name}_週報表.csv`); };
-      const exportDailyLog = () => { let csv = `班級日誌,日期：${currentDate},週次：${todayData.week},值日：${todayData.dutyOfficer}/${todayData.dutyStudent}\n\n`; csv += `【到校】\n類別,學生\n`; ATTENDANCE_TYPES.forEach(t => { const list = todayData.attendanceData[t.id]?.map(id => { const s = students.find(stud => stud.id === id); return s ? `${id}(${s.name})` : id; }).join('、') || ''; if(list) csv += `${t.label},"${list}"\n`; }); csv += `\n【作業】\n項目,缺交\n`; const getMissingNames = (list) => list?.map(id => { const s = students.find(stud => stud.id === id); return s ? `${id}(${s.name})` : id; }).join('、') || ''; CONTACT_BOOK_TYPES.forEach(t => { const str = getMissingNames(todayData.missingData[t.id]); if(str) csv += `${t.label},"${str}"\n`; }); subjects.forEach(s => { const str = getMissingNames(todayData.missingData[s.id]); if(str) csv += `${s.label}缺交,"${str}"\n`; }); csv += `\n【課堂】\n時段,行為,學生,備註\n`; PERIODS.forEach(p => { const logs = todayData.classLogData[p.id]; const note = todayData.periodNotes[p.id] || ''; if (logs) { behaviors.forEach(b => { const rawList = logs[b.id]; if (rawList && rawList.length > 0) { const names = rawList.map(id => { const s = students.find(stud => stud.id === id); return s ? `${id}(${s.name})` : id; }).join('、'); csv += `${p.label},${b.label},"${names}","${note}"\n`; } }); } if ((!logs || Object.keys(logs).every(k => logs[k].length === 0)) && note) { csv += `${p.label},備註,,"${note}"\n`; } }); csv += `\n【偶發】\n"${todayData.incidentLog.replace(/"/g, '""')}"\n`; downloadCSV(csv, `班級日誌_${currentDate}.csv`); };
-      const generateParentMessage = (studentId) => { const s = students.find(stud => stud.id === studentId); if (!s) return "請先選擇學生..."; const { dates, stats, detailedBehaviors, detailedAttendance, detailedMissing } = getWeeklyStats(studentId); const dateRange = `${dates[dates.length-1].slice(5).replace('-','/')} ~ ${dates[0].slice(5).replace('-','/')}`; let msg = ""; if (teacherNote.trim()) { msg += `📢 ⭐⭐⭐ 重要通知 ⭐⭐⭐\n${teacherNote}\n\n------------------------------\n\n`; } msg += `【班級週報】親愛的家長您好，這是 ${s.name} 本週 (${dateRange}) 的在校表現摘要：\n\n`; if (detailedAttendance.length > 0) { msg += `📅 考勤紀錄：\n`; detailedAttendance.forEach(item => { msg += `   - ${item}\n`; }); } else { msg += `📅 考勤紀錄：全勤 👍\n`; } if (detailedMissing.length > 0) { msg += `📚 作業與物品：\n`; detailedMissing.forEach(item => { msg += `   - ${item}\n`; }); } else { msg += `📚 作業繳交：狀況良好 👍\n`; } if (detailedBehaviors.length > 0) { msg += `⚠️ 課堂常規提醒：\n`; detailedBehaviors.forEach(item => { msg += `   - ${item}\n`; }); } else { msg += `✨ 課堂表現：遵守常規，表現穩定。\n`; } msg += `\n再請您協助關心孩子的學習狀況，謝謝您的配合！`; return msg; };
-      const handleLineShare = (text) => { const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`; window.open(lineUrl, '_blank'); };
-      const copyToClipboard = (text) => { navigator.clipboard.writeText(text).then(() => alert('已複製訊息！')); };
-
-      // --- Render Functions ---
-      const renderBasicInfo = () => (
-        <div className="space-y-6 pb-24">
-          <div className="doodle-card p-5 space-y-4 bg-white"><div className="flex gap-3"><div className="flex-1"><label className="text-base font-bold opacity-70">日期</label><input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} className="input-hand text-lg" /></div><div className="w-1/3"><label className="text-base font-bold opacity-70">週次</label><input type="text" value={todayData.week} onChange={e => updateToday('week', e.target.value)} className="input-hand text-center text-lg" /></div></div><div className="flex gap-3"><div className="flex-1"><label className="text-base font-bold opacity-70">值日幹部</label><input type="text" value={todayData.dutyOfficer} onChange={e => updateToday('dutyOfficer', e.target.value)} className="input-hand text-lg" /></div><div className="flex-1"><label className="text-base font-bold opacity-70">值日生</label><input type="text" value={todayData.dutyStudent} onChange={e => updateToday('dutyStudent', e.target.value)} className="input-hand text-lg" /></div></div></div>
-          <div className="doodle-card p-5 bg-white relative overflow-hidden"><div className="absolute top-0 left-0 w-full h-4 bg-mint border-b-2 border-coffee"></div><h3 className="text-2xl font-bold mb-5 mt-3 flex items-center gap-2"><Clock size={28} /> 到校狀況</h3><div className="grid grid-cols-2 gap-4">{ATTENDANCE_TYPES.map(type => { const count = todayData.attendanceData[type.id]?.length || 0; return <button key={type.id} onClick={() => openSelector('attendance', type.id)} className={`btn-3d p-3 flex items-center justify-between px-4 ${type.color} text-lg h-14`}><div className="flex items-center gap-2"><type.icon size={20} /><span>{type.label}</span></div>{count > 0 && <span className="bg-coffee text-white text-sm px-3 py-1 rounded-full">{count}</span>}</button> })}</div></div>
-          <div className="doodle-card p-5 bg-white relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-4 bg-yellow border-b-2 border-coffee"></div>
-            <h3 className="text-2xl font-bold mb-5 mt-3 flex items-center gap-2"><FileWarning size={28} /> 作業與聯絡簿</h3>
-            <div className="grid grid-cols-1 gap-3 mb-4">{CONTACT_BOOK_TYPES.map(item => <button key={item.id} onClick={() => openSelector('missing', item.id)} className={`btn-3d w-full py-3 flex justify-between px-5 text-lg ${item.color}`}><div className="flex items-center gap-3"><item.icon size={22}/><span>{item.label}</span></div>{todayData.missingData[item.id]?.length > 0 && <span className="bg-coffee text-white text-sm px-3 py-1 rounded-full">{todayData.missingData[item.id].length}</span>}</button>)}</div>
-            <div className="border-t-2 border-coffee pt-4 space-y-4">
-               <div className="flex justify-between items-center"><h4 className="font-bold text-coffee opacity-80 text-lg">各科作業缺交</h4><button onClick={() => setIsAddingSubject(!isAddingSubject)} className="text-sm bg-mint px-3 py-1 rounded-full border-2 border-coffee hover:bg-green-200"><Plus size={16} /></button></div>
-               {isAddingSubject && <div className="flex gap-2"><input autoFocus type="text" value={newSubjectName} onChange={e => setNewSubjectName(e.target.value)} className="input-hand text-lg py-2" /><button onClick={handleAddSubject} className="btn-3d px-4 bg-coffee text-white text-lg">OK</button></div>}
-               {subjects.length > 0 ? (
-                 <div className="space-y-3">
-                   <div className="flex gap-2">
-                     <select value={currentSubjectId} onChange={(e) => setCurrentSubjectId(e.target.value)} className="input-hand text-lg flex-1 bg-gray-50 font-bold border-2 border-coffee">{subjects.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
-                     <button onClick={(e) => handleDeleteSubject(currentSubjectId, e)} className="btn-3d bg-pink text-white px-3"><Trash2 size={24}/></button>
-                   </div>
-                   <button onClick={() => openSelector('missing', currentSubjectId)} className="btn-3d w-full bg-white py-4 text-lg flex justify-between px-5 border-2 border-coffee shadow-sm group active:bg-yellow">
-                     <span className="font-bold flex items-center gap-2"><Edit3 size={20}/> 登記 {subjects.find(s=>s.id===currentSubjectId)?.label} 缺交</span>
-                     {todayData.missingData[currentSubjectId]?.length > 0 ? (
-                        <div className="text-right"><span className="bg-pink text-white px-3 py-1 rounded-full text-sm font-bold block w-fit ml-auto mb-1">{todayData.missingData[currentSubjectId].length} 人</span><span className="text-xs text-pink-600 font-bold block max-w-[150px] truncate">{todayData.missingData[currentSubjectId].sort((a,b)=>a-b).join('、')}號</span></div>
-                     ) : <span className="text-gray-400 text-sm">點擊登記</span>}
-                   </button>
-                 </div>
-               ) : <div className="text-center text-gray-400 py-2">請先新增科目...</div>}
-               <div className="flex flex-col gap-2 mt-2">{subjects.map(s => { const list = todayData.missingData[s.id]; if (!list || list.length === 0) return null; const sortedList = [...list].sort((a,b) => a-b).join('、'); return ( <button key={s.id} onClick={() => { setCurrentSubjectId(s.id); openSelector('missing', s.id); }} className="bg-white border-2 border-coffee px-3 py-2 rounded-xl text-sm font-bold flex items-center justify-between shadow-sm hover:bg-gray-50 w-full text-left"><span className="flex items-center gap-2 text-lg text-coffee">{s.label}</span><div className="flex items-center gap-2 overflow-hidden"><span className="text-coffee opacity-80 truncate text-sm">缺交：{sortedList}號</span><span className="bg-pink text-white px-2 py-1 rounded-full text-xs shrink-0">{list.length}人</span></div></button> ) })}</div>
-            </div>
-          </div>
-        </div>
-      );
-
-      const renderLog = () => (
-        <div className="space-y-5 pb-24">
-          <div className="doodle-card p-4 bg-white flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <label className="font-bold text-coffee text-xl shrink-0">選擇時段：</label>
-              <select value={currentLogPeriod} onChange={(e) => setCurrentLogPeriod(e.target.value)} className="input-hand text-2xl font-bold bg-yellow border-2 border-coffee h-14 flex-1">
-                {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </select>
-            </div>
-            <div className="relative">
-              <input type="text" value={todayData.periodNotes[currentLogPeriod] || ''} onChange={(e) => updatePeriodNote(e.target.value)} placeholder={`在此輸入${PERIODS.find(p=>p.id===currentLogPeriod)?.label}的備註...`} className="input-hand text-lg bg-gray-50 pr-10" />
-              <PenTool size={20} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            </div>
-          </div>
-          <div className="flex justify-between items-center px-1">
-            <h4 className="font-bold text-coffee opacity-80 text-xl">違規項目</h4>
-            <button onClick={() => setIsEditingBehaviors(!isEditingBehaviors)} className={`px-3 py-1 rounded-full border-2 border-coffee text-sm font-bold flex items-center gap-1 ${isEditingBehaviors ? 'bg-pink text-white' : 'bg-gray-100'}`}><Settings size={16} /> {isEditingBehaviors ? '完成' : '編輯'}</button>
-          </div>
-          {isEditingBehaviors && <div className="doodle-card p-4 bg-yellow flex gap-3"><input type="text" value={newBehaviorName} onChange={e => setNewBehaviorName(e.target.value)} placeholder="新違規項目..." className="input-hand text-lg" /><button onClick={handleAddBehavior} className="btn-3d bg-coffee text-white px-4"><Plus size={24}/></button></div>}
-          <div className="grid grid-cols-3 gap-3">{behaviors.map(behavior => { 
-            const count = todayData.classLogData[currentLogPeriod]?.[behavior.id]?.length || 0; 
-            const Icon = ICON_MAP[behavior.icon] || AlertCircle; 
-            return ( 
-              <button key={behavior.id} onClick={() => handleBehaviorClick(behavior.id)} className={`btn-3d p-2 flex flex-col items-center gap-1 ${behavior.color} min-h-[90px] relative`}>
-                {isEditingBehaviors && <span onClick={(e) => handleDeleteBehavior(behavior.id, e)} className="absolute top-1 right-1 bg-white rounded-full p-1 border border-coffee text-red-500 z-20"><X size={14} strokeWidth={3} /></span>}
-                <Icon size={32} />
-                <span className="text-xl text-center leading-tight">{behavior.label}</span>
-                {!isEditingBehaviors && count > 0 && <span className="absolute -top-2 -right-2 bg-coffee text-white text-xs w-7 h-7 flex items-center justify-center rounded-full border-2 border-white shadow-md font-bold animate-bounce">{count}</span>}
-              </button> 
-            );
-          })}</div>
-
-          {/* 顯示該時段已登記的詳細清單 */}
-          <div className="mt-6 space-y-2">
-             {behaviors.map(b => {
-                const list = todayData.classLogData[currentLogPeriod]?.[b.id];
-                if(!list || list.length === 0) return null;
-                return (
-                  <div key={b.id} className="bg-white border-2 border-coffee rounded-xl p-3 shadow-sm">
-                     <div className="flex items-center gap-2 mb-2 border-b-2 border-gray-100 pb-2">
-                        <div className={`w-3 h-3 rounded-full ${b.color}`}></div>
-                        <span className="font-bold text-coffee">{b.label}</span>
-                     </div>
-                     <div className="flex flex-wrap gap-2">
-                        {list.map(studentId => {
-                           const s = students.find(stud => stud.id === studentId);
-                           return (
-                             <button key={studentId} onClick={() => toggleStudent(studentId)} className="bg-gray-100 hover:bg-pink-100 text-coffee px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1 border border-gray-300">
-                                {s ? `${s.id}.${s.name}` : `${studentId}號`} <X size={14}/>
-                             </button>
-                           )
-                        })}
-                     </div>
-                  </div>
-                )
-             })}
-          </div>
-        </div>
-      );
-
-      const renderSettings = () => (
-        <div className="space-y-6 pb-24">
-           {/* 1. 老師備忘錄 */}
-           <div className="doodle-card p-5 bg-white">
-              <h3 className="text-2xl font-bold mb-3 flex items-center gap-2 text-coffee"><Megaphone size={24}/> 老師備忘 / 公告</h3>
-              <textarea 
-                value={teacherNote} 
-                onChange={(e) => setTeacherNote(e.target.value)} 
-                className="input-hand w-full h-32 text-lg resize-none" 
-                placeholder="輸入要顯示在家長通知中的重要事項..."
-              />
-           </div>
-
-           {/* 2. 報表輸出 */}
-           <div className="doodle-card p-5 bg-yellow">
-              <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-coffee"><FileSpreadsheet size={24}/> 報表輸出</h3>
-              <div className="grid grid-cols-1 gap-3">
-                 <button onClick={exportDailyLog} className="btn-3d bg-white py-3 text-lg"><Download size={20} className="mr-2"/> 下載今日班級日誌 (CSV)</button>
-                 <button onClick={exportWholeClassWeekly} className="btn-3d bg-mint py-3 text-lg"><Users size={20} className="mr-2"/> 下載全班週報表 (CSV)</button>
-                 
-                 <div className="bg-white/50 p-3 rounded-xl border-2 border-coffee mt-2">
-                    <label className="text-sm font-bold opacity-70 mb-2 block">個別學生週報 / 家長通知</label>
-                    <div className="flex gap-2">
-                       <select value={selectedStudentReport} onChange={e => setSelectedStudentReport(Number(e.target.value))} className="input-hand flex-1 text-lg py-2">
-                          {students.map(s => <option key={s.id} value={s.id}>{s.id}. {s.name}</option>)}
-                       </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                       <button onClick={exportStudentWeekly} className="btn-3d bg-white py-2 text-base"><Download size={18} className="mr-2"/> 下載週報</button>
-                       <button onClick={() => {
-                          const msg = generateParentMessage(selectedStudentReport);
-                          if(confirm('即將開啟 LINE 分享頁面，確定嗎？')) handleLineShare(msg);
-                       }} className="btn-3d bg-line py-2 text-base"><Share size={18} className="mr-2"/> LINE 通知</button>
-                       <button onClick={() => {
-                          const msg = generateParentMessage(selectedStudentReport);
-                          copyToClipboard(msg);
-                       }} className="btn-3d bg-blue-soft py-2 text-base col-span-2"><ClipboardCopy size={18} className="mr-2"/> 複製通知文字</button>
-                    </div>
-                 </div>
-              </div>
-           </div>
-
-           {/* 3. 資料管理 (備份/還原) */}
-           <div className="doodle-card p-5 bg-pink text-coffee">
-              <h3 className="text-2xl font-bold mb-4 flex items-center gap-2"><Database size={24}/> 資料安全</h3>
-              <div className="grid grid-cols-2 gap-3">
-                 <button onClick={handleBackupData} className="btn-3d bg-white py-3 text-lg"><Save size={20} className="mr-2"/> 備份資料</button>
-                 <label className="btn-3d bg-white py-3 text-lg cursor-pointer">
-                    <Upload size={20} className="mr-2"/> 還原資料
-                    <input type="file" accept=".json" onChange={handleRestoreData} className="hidden" />
-                 </label>
-              </div>
-              <p className="text-xs mt-2 opacity-70 text-center font-bold">建議每週五下載備份檔保存</p>
-           </div>
-
-           {/* 4. 學生名單管理 */}
-           <div className="doodle-card p-5 bg-white">
-              <h3 className="text-2xl font-bold mb-4 flex items-center gap-2"><UserCog size={24}/> 學生名單管理</h3>
-              <textarea 
-                 value={bulkNamesInput} 
-                 onChange={e => setBulkNamesInput(e.target.value)} 
-                 className="input-hand h-24 text-sm mb-2" 
-                 placeholder="在此貼上學生名單 (一行一個名字)...&#10;王小明&#10;李大華&#10;張小美"
-              />
-              <button onClick={handleBulkImportNames} className="btn-3d bg-coffee text-white w-full py-3 mb-4">批次匯入 / 重設名單</button>
-              
-              <div className="max-h-60 overflow-y-auto border-2 border-coffee rounded-xl p-2 bg-gray-50 grid grid-cols-2 gap-2">
-                 {students.map(s => (
-                    <div key={s.id} className="flex items-center gap-1 bg-white p-1 rounded border border-gray-200">
-                       <span className="w-6 text-center font-bold text-gray-400 text-xs">{s.id}</span>
-                       <input 
-                          type="text" 
-                          value={s.name} 
-                          onChange={(e) => handleUpdateStudentName(s.id, e.target.value)}
-                          className="flex-1 bg-transparent border-none text-sm font-bold focus:outline-none text-coffee"
-                       />
-                    </div>
-                 ))}
-              </div>
-           </div>
-
-           <div className="text-center opacity-40 text-sm font-bold pb-4">
-              班級小管家 V10.0 (Local Storage Edition)
-           </div>
-        </div>
-      );
+      const total = expenses.reduce((sum, i) => sum + i.cost, 0);
 
       return (
-        <>
-          <style>{customStyles}</style>
-          <div className="min-h-screen pb-safe-area-inset-bottom">
+        <div className="flex flex-col h-full max-w-md mx-auto bg-white shadow-2xl">
+          
+          {/* Header 標題列 */}
+          <header className="bg-white/90 backdrop-blur border-b border-slate-100 px-5 py-3 pt-safe sticky top-0 z-20">
+            <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <span className="bg-red-600 text-white w-6 h-6 flex items-center justify-center rounded text-xs">長</span>
+              長野旅人手帳
+            </h1>
+          </header>
+
+          {/* Main 內容區 */}
+          <main className="flex-1 overflow-y-auto bg-slate-50 p-4 pb-24 hide-scrollbar">
             
-            {/* 頂部標題列 */}
-            <div className="sticky top-0 z-40 bg-[#FEF9F2]/95 backdrop-blur-sm px-4 py-3 border-b-4 border-coffee shadow-sm flex justify-between items-center">
-               <div>
-                  <h1 className="text-3xl text-coffee flex items-center gap-2" style={{ fontFamily: 'ZCOOL KuaiLe' }}>
-                    <span className="bg-coffee text-white px-2 rounded-lg transform -rotate-3 text-2xl">班</span>
-                    <span className="transform rotate-2">級日誌</span>
-                  </h1>
-                  <p className="text-xs font-bold text-coffee opacity-60 ml-1">{currentDate} (週{['日','一','二','三','四','五','六'][new Date(currentDate).getDay()]})</p>
-               </div>
-               
-               <div className="flex items-center gap-2">
-                  {saveStatus === 'saving' && <span className="text-xs bg-yellow px-2 py-1 rounded-full border border-coffee font-bold animate-pulse">儲存中...</span>}
-                  {saveStatus === 'saved' && <span className="text-xs bg-mint px-2 py-1 rounded-full border border-coffee font-bold text-coffee">已儲存</span>}
-               </div>
-            </div>
+            {/* 1. 攻略頁面 View */}
+            {view === 'guide' && (
+              <div className="space-y-4">
+                {/* Banner */}
+                <div className="bg-slate-800 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
+                  <h2 className="text-xl font-bold relative z-10">長野 Nagano</h2>
+                  <p className="text-xs text-slate-300 relative z-10">雪、神社、蘋果派</p>
+                  <div className="absolute right-[-10px] bottom-[-20px] text-8xl opacity-10 rotate-12">❄</div>
+                </div>
 
-            {/* 主要內容區 */}
-            <div className="p-4 max-w-lg mx-auto w-full">
-               {activeTab === 'basic' && renderBasicInfo()}
-               {activeTab === 'log' && renderLog()}
-               {activeTab === 'settings' && renderSettings()}
-            </div>
+                {/* 巴士資訊 */}
+                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Icon path={paths.bus} color="text-red-500"/> 戶隱巴士時刻
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="block text-xs font-bold text-red-500 mb-1">去程 (長野站發)</span>
+                      <div className="font-mono text-slate-600">07:00 · 08:00<br/>09:00 · 10:00</div>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-blue-500 mb-1">回程 (中社發)</span>
+                      <div className="font-mono text-slate-600">13:00 · 14:00<br/>15:00 · 16:00</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-50 text-xs text-slate-400">
+                    * 長野站東口 7 號月台 (單程 ¥1,400)
+                  </div>
+                </div>
 
-            {/* 底部導航列 */}
-            <div className="fixed bottom-0 left-0 w-full bg-white border-t-4 border-coffee pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]">
-               <div className="max-w-lg mx-auto grid grid-cols-3 gap-8 px-6 py-2 h-20 items-end">
-                  <button onClick={() => setActiveTab('basic')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'basic' ? 'transform -translate-y-3 scale-110' : 'opacity-60 hover:opacity-100'}`}>
-                     <div className={`p-3 rounded-2xl border-2 border-coffee shadow-[4px_4px_0px_#5D4037] ${activeTab === 'basic' ? 'bg-mint' : 'bg-white'}`}>
-                        <ClipboardCopy size={24} strokeWidth={2.5} className="text-coffee"/>
-                     </div>
-                     <span className="text-xs font-bold text-coffee">基本</span>
-                  </button>
+                {/* 行程列表 */}
+                <div className="space-y-3">
+                  <h3 className="font-bold text-slate-800 ml-1">精華行程</h3>
+                  {[
+                    {d:"Day 1", t:"戶隱神社", c:"戶隱中社 → 古杉參道 → 吃蕎麥麵"},
+                    {d:"Day 2", t:"善光寺與美食", c:"善光寺參拜 → 蘋果派 → 味噌拉麵"},
+                    {d:"Day 3", t:"雪猴溫泉", c:"地獄谷野猿公苑 → 小布施甜點"}
+                  ].map((p, i) => (
+                    <div key={i} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">{p.d}</span>
+                        <span className="font-bold text-slate-800 text-sm">{p.t}</span>
+                      </div>
+                      <p className="text-sm text-slate-500 mt-2">{p.c}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                  <button onClick={() => setActiveTab('log')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'log' ? 'transform -translate-y-3 scale-110' : 'opacity-60 hover:opacity-100'}`}>
-                     <div className={`p-3 rounded-2xl border-2 border-coffee shadow-[4px_4px_0px_#5D4037] ${activeTab === 'log' ? 'bg-yellow' : 'bg-white'}`}>
-                        <List size={24} strokeWidth={2.5} className="text-coffee"/>
-                     </div>
-                     <span className="text-xs font-bold text-coffee">日誌</span>
-                  </button>
+            {/* 2. 記帳頁面 View */}
+            {view === 'money' && (
+              <div className="space-y-4">
+                {/* 總金額卡片 */}
+                <div className="bg-slate-800 text-white p-6 rounded-2xl shadow-lg text-center">
+                  <div className="text-xs text-slate-400 mb-1">總支出 (JPY)</div>
+                  <div className="text-4xl font-mono font-bold tracking-tight">¥{total.toLocaleString()}</div>
+                  <div className="text-xs text-slate-500 mt-2">約台幣 {(total*0.21).toFixed(0)} 元</div>
+                </div>
 
-                  <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'settings' ? 'transform -translate-y-3 scale-110' : 'opacity-60 hover:opacity-100'}`}>
-                     <div className={`p-3 rounded-2xl border-2 border-coffee shadow-[4px_4px_0px_#5D4037] ${activeTab === 'settings' ? 'bg-pink' : 'bg-white'}`}>
-                        <Settings size={24} strokeWidth={2.5} className="text-coffee"/>
-                     </div>
-                     <span className="text-xs font-bold text-coffee">設定</span>
-                  </button>
-               </div>
-            </div>
+                {/* 輸入區 */}
+                <div className="flex gap-2 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                  <input value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="項目" className="flex-1 bg-slate-50 px-3 py-2 rounded-lg text-sm outline-none" />
+                  <input value={inputCost} onChange={e=>setInputCost(e.target.value)} type="number" placeholder="¥" className="w-20 bg-slate-50 px-3 py-2 rounded-lg text-sm outline-none" />
+                  <button onClick={addEx} className="bg-red-500 text-white px-4 rounded-lg font-bold text-xl btn-active">+</button>
+                </div>
 
-            {/* 學生選擇 Modal */}
-            <StudentSelectorModal 
-               isOpen={isSelectorOpen} 
-               onClose={() => setIsSelectorOpen(false)}
-               students={students}
-               selectedList={getSelectedList()}
-               title={
-                 selectorConfig.type === 'attendance' ? ATTENDANCE_TYPES.find(t=>t.id===selectorConfig.category)?.label :
-                 selectorConfig.type === 'missing' ? (CONTACT_BOOK_TYPES.find(t=>t.id===selectorConfig.category)?.label || subjects.find(s=>s.id===selectorConfig.category)?.label) :
-                 (behaviors.find(b=>b.id===selectorConfig.category)?.label || '違規項目')
-               }
-               onToggle={toggleStudent}
-            />
+                {/* 列表區 */}
+                <div className="space-y-2">
+                  {expenses.map(e => (
+                    <div key={e.id} className="bg-white p-4 rounded-xl border border-slate-50 shadow-sm flex justify-between items-center">
+                      <div>
+                        <div className="font-bold text-slate-700 text-sm">{e.name}</div>
+                        <div className="text-xs text-slate-400">{e.date}</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-bold text-slate-700">¥{e.cost.toLocaleString()}</span>
+                        <button onClick={()=>delEx(e.id)} className="text-slate-300 hover:text-red-500">
+                          <Icon path={paths.trash} color="w-4 h-4"/>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {expenses.length === 0 && <div className="text-center text-slate-300 py-10 text-sm">尚無紀錄</div>}
+                </div>
+              </div>
+            )}
 
-          </div>
-        </>
+            {/* 3. 日記頁面 View */}
+            {view === 'journal' && (
+              <div className="h-full flex flex-col">
+                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 mb-4">
+                  <textarea value={inputText} onChange={e=>setInputText(e.target.value)} className="w-full h-24 bg-slate-50 rounded-lg p-3 text-sm outline-none resize-none" placeholder="寫點什麼..."></textarea>
+                  <div className="flex justify-end mt-2">
+                    <button onClick={addJo} disabled={!inputText} className="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-sm font-bold btn-active disabled:opacity-50">發佈</button>
+                  </div>
+                </div>
+                <div className="space-y-3 pb-4">
+                  {journals.map(j => (
+                    <div key={j.id} className="bg-white p-4 rounded-xl border border-slate-50 shadow-sm relative">
+                      <div className="text-xs text-slate-400 mb-2 pb-2 border-b border-slate-50">{j.date}</div>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{j.text}</p>
+                      <button onClick={()=>delJo(j.id)} className="absolute top-3 right-3 text-slate-200 hover:text-red-500">
+                        <Icon path={paths.trash} color="w-4 h-4"/>
+                      </button>
+                    </div>
+                  ))}
+                  {journals.length === 0 && <div className="text-center text-slate-300 py-10 text-sm">還沒有日記，寫一篇吧</div>}
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Bottom Nav 底部導航 */}
+          <nav className="bg-white border-t border-slate-100 pb-safe fixed bottom-0 w-full max-w-md flex justify-around items-center h-16 z-30">
+            <button onClick={()=>setView('guide')} className={`flex flex-col items-center w-16 btn-active ${view==='guide'?'text-red-600':'text-slate-300'}`}>
+              <Icon path={paths.book} color="currentColor"/>
+              <span className="text-[10px] font-bold mt-1">攻略</span>
+            </button>
+            <button onClick={()=>setView('money')} className={`flex flex-col items-center w-16 btn-active ${view==='money'?'text-red-600':'text-slate-300'}`}>
+              <Icon path={paths.money} color="currentColor"/>
+              <span className="text-[10px] font-bold mt-1">記帳</span>
+            </button>
+            <button onClick={()=>setView('journal')} className={`flex flex-col items-center w-16 btn-active ${view==='journal'?'text-red-600':'text-slate-300'}`}>
+              <Icon path={paths.pen} color="currentColor"/>
+              <span className="text-[10px] font-bold mt-1">日記</span>
+            </button>
+          </nav>
+
+        </div>
       );
     }
 
